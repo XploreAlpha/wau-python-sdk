@@ -47,6 +47,9 @@ class AgentsService:
             params["search"] = opts.search
         data = self._transport.request("GET", "/registry/agents", params=params)
         resp = AgentListResponse(**data)
+        # 嵌套 dict → Agent dataclass
+        if resp.agents:
+            resp.agents = [Agent(**a) if isinstance(a, dict) else a for a in resp.agents]
         return resp
 
     def iter(self, opts: PageOptions | None = None) -> Iterator[Agent]:
@@ -68,7 +71,13 @@ class AgentsService:
     def get(self, name: str) -> AgentStatus:
         """GET /registry/agents/{name}/status"""
         data = self._transport.request("GET", f"/registry/agents/{name}/status")
-        return AgentStatus(**data) if data else AgentStatus(name=name, status="unknown")
+        if not data:
+            return AgentStatus(name=name, status="unknown")
+        # 处理嵌套 load 字段(kernel 返 dict,需要转 AgentLoad)
+        load_data = data.get("load", {}) or {}
+        if isinstance(load_data, dict):
+            data = {**data, "load": AgentLoad(**load_data)}
+        return AgentStatus(**data)
 
     def score(self, name: str) -> AgentScore:
         """GET /registry/agents/{name}/score"""
@@ -131,11 +140,19 @@ class AsyncAgentsService:
         if opts.search:
             params["search"] = opts.search
         data = await self._transport.request("GET", "/registry/agents", params=params)
-        return AgentListResponse(**data)
+        resp = AgentListResponse(**data)
+        if resp.agents:
+            resp.agents = [Agent(**a) if isinstance(a, dict) else a for a in resp.agents]
+        return resp
 
     async def get(self, name: str) -> AgentStatus:
         data = await self._transport.request("GET", f"/registry/agents/{name}/status")
-        return AgentStatus(**data) if data else AgentStatus(name=name, status="unknown")
+        if not data:
+            return AgentStatus(name=name, status="unknown")
+        load_data = data.get("load", {}) or {}
+        if isinstance(load_data, dict):
+            data = {**data, "load": AgentLoad(**load_data)}
+        return AgentStatus(**data)
 
     async def score(self, name: str) -> AgentScore:
         data = await self._transport.request("GET", f"/registry/agents/{name}/score")

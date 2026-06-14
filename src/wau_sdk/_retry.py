@@ -16,6 +16,7 @@ from tenacity import (
     AsyncRetrying,
     RetryCallState,
     Retrying,
+    retry_if_exception,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential_jitter,
@@ -75,19 +76,15 @@ class Retrier:
             for attempt in Retrying(
                 stop=self._stop,
                 wait=self._wait,
-                retry=retry_if_exception_type((APIError, httpx.RequestError, ConnectionError, TimeoutError)),
+                # 用 is_retryable 做谓词:5xx + 429 + 网络错重试,4xx 不重试
+                retry=retry_if_exception(lambda exc: is_retryable(exc)),
                 reraise=True,
             ):
                 with attempt:
-                    # tenacity 8.x: predicate 需在 retry 参数里,这里用 after hook 过滤 4xx
-                    if attempt.retry_state.outcome and attempt.retry_state.outcome.exception():
-                        exc = attempt.retry_state.outcome.exception()
-                        if not is_retryable(exc):
-                            # 不可重试错误,直接 raise
-                            raise exc
                     return op()
         except (APIError, httpx.RequestError, ConnectionError, TimeoutError) as last_exc:
-            if is_retryable(last_exc):
+            # MaxRetries=0 时不抛 MaxRetriesError(只调了 1 次,没"耗尽"概念)
+            if is_retryable(last_exc) and self._config.max_retries > 0:
                 raise MaxRetriesError(last_exc) from last_exc
             raise last_exc
 
@@ -107,19 +104,15 @@ class AsyncRetrier:
     async def do(self, op: Callable[[], Awaitable[T]]) -> T:
         """执行 async op,失败按配置重试"""
         try:
-            for attempt in AsyncRetrying(
+            async for attempt in AsyncRetrying(
                 stop=self._stop,
                 wait=self._wait,
-                retry=retry_if_exception_type((APIError, httpx.RequestError, ConnectionError, TimeoutError)),
+                retry=retry_if_exception(lambda exc: is_retryable(exc)),
                 reraise=True,
             ):
                 with attempt:
-                    if attempt.retry_state.outcome and attempt.retry_state.outcome.exception():
-                        exc = attempt.retry_state.outcome.exception()
-                        if not is_retryable(exc):
-                            raise exc
                     return await op()
         except (APIError, httpx.RequestError, ConnectionError, TimeoutError) as last_exc:
-            if is_retryable(last_exc):
+            if is_retryable(last_exc) and self._config.max_retries > 0:
                 raise MaxRetriesError(last_exc) from last_exc
             raise last_exc
