@@ -1,0 +1,93 @@
+# Changelog
+
+## v0.6.0-preview.1 (2026-06-14)
+
+> 🔶 Carnelian M3 W6 — 完整 Python SDK
+> 抽取自 wau-cli/internal/client/(337 行, 4 文件) Go 版,扩展 Python 生态
+
+### 新增
+
+- **HTTP API 11 端点 × 2 同步/异步 = 22 方法**(P1 阶段):
+  - `KernelService`: Info + Health
+  - `AgentsService`: Health + List + Iter + Get + Score + Register + Deregister + Heartbeat + ReportLoad
+  - `TasksService`: Submit + Simulate + Get
+  - `IntentService`: 4 个 gRPC stub(M3.1 实装,目前返 NotImplementedError)
+- **typed errors**:`APIError` 基类 + 6 个 4xx 子类(NotFoundError/UnauthorizedError/ForbiddenError/BadRequestError/ConflictError/APIError)
+- **重试装饰器**:指数退避 + 抖动(tenacity),默认 3 次 / 200ms-5s,只重试 5xx/429 + 网络错
+- **熔断装饰器**:集成 wau-circuit(154 行 Go → ~150 行 Python 翻译),per-Client 实例,5 failures / 30s recovery
+- **HS256 鉴权**:JWT Bearer(PyJWT),5min exp,UUID v4 jti 防重放
+- **SubmitRequest 字段以 kernel 真相源为准**:`{prompt, timeout_ms}`,**不是** wau-cli 旧 DTO(`{message, sourcePeer, ...}`)
+- **分页迭代器**:`Iter(opts) -> Iterator[Agent]`,Go 1.23+ 泛型等价物
+- **5 场景契约测试**:clinical / france / pain / sales / rare-disease(从 [wau-go-sdk 黄金 JSON](https://github.com/XploreAlpha/wau-go-sdk/tree/main/tests/contract-golden) 复用,3 SDK 行为字节级对齐)
+
+### 测试
+
+- **95 passed in 3.36s** (95 个单测 + 5 场景契约 + 黄金 schema 验证)
+- **覆盖率 88%** (超过 plan §10.2 80% 门槛 8%)
+
+| 模块 | 覆盖率 |
+|---|---|
+| `types.py` / `__init__.py` / `_circuit.py` | 100% |
+| `_retry.py` | 98% |
+| `_auth.py` | 91% |
+| `_client.py` | 88% |
+| `_errors.py` / `_options.py` | 86% |
+| `agents.py` | 84% |
+| `tasks.py` | 80% |
+| `_transport.py` | 78% |
+| `kernel.py` | 76% |
+| `intent.py` | 71% |
+
+### 修复的真 bug(M3 W6 期间)
+
+1. **`_retry.py`**: `retry_if_exception_type` 误捕获 4xx → 改用 `retry_if_exception(is_retryable)` 谓词
+2. **`_retry.py`**: Tenacity `AsyncRetrying` 不支持 `for` → 改用 `async for`
+3. **`_retry.py`**: MaxRetries=0 仍抛 `MaxRetriesError` → 加 `max_retries > 0` 检查
+4. **`agents.py`**: `AgentListResponse.agents` 是 list[dict](dataclass 不自动转嵌套) → 加显式 dict → Agent 转换
+5. **`agents.py`**: `get()` load 字段 dict 不转 AgentLoad → 转换
+6. **`kernel.py`**: 字段名 camelCase(`startTime`) → 显式转 snake_case(用 `data.get(...)`)
+7. **`_errors.py`**: 4xx 子类接口与 `APIError` 基类冲突 → 用闭包工厂 + `__init__` 重写
+8. **`_retry.py`**: `tenacity.AsyncRetrying` 不是 iterable → 用 `async for` 而非 `for`
+
+### 文档
+
+- `README.md` — 项目状态 + 快速开始
+- `docs/quickstart.md` — 5 分钟接入(同步 + 异步)
+- `docs/api.md` — 完整 API 参考(11 端点 + DTO + 错误)
+- `docs/auth.md` — HS256 鉴权指南
+- `docs/retry_circuit.md` — 重试 + 熔断详解
+
+### CI
+
+- `.github/workflows/ci.yml` — pytest + ruff + mypy + coverage (4 Python 版本 × 2 OS)
+
+### Examples
+
+- `examples/list_agents/main.py` — 列出在线 agents
+- `examples/submit_task/main.py` — 提交 L4 任务
+- `examples/heartbeat_loop/main.py` — agent 端定时心跳(60s 间隔)
+- `examples/five_scenarios/main.py` — 跑 5 场景契约
+
+### 已知限制(P2/P3 推迟)
+
+- ❌ **gRPC client (P2)**:所有 `IntentService` 方法返 `NotImplementedError`
+- ❌ **A2A/AFP 协议层 (P3)**:SDK 不暴露 Protocol interface
+- ❌ **30 个 gRPC RPC** (Scheduler / Scoring / Store / Circuit):P2 阶段做
+- ❌ **wau-cli 老 client 替换**:等 M3 收尾(2026-07-05)
+
+### 升级指引(从 wau-cli 老 client)
+
+```python
+- from wau_cli.internal.client import NewClient
++ import wau_sdk
+
+- client = NewClient(base_url=..., role=...)
++ client = wau_sdk.Client("http://localhost:18400", wau_sdk.ClientOptions(
++     auth=wau_sdk.AuthConfig(agent_name="...", shared_secret=...),
++ ))
+
+- resp = client.SubmitTask(prompt=..., source_peer=...)
++ resp = client.tasks.submit(wau_sdk.SubmitRequest(
++     prompt=..., timeout_ms=30000,
++ ))
+```
