@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "wau-sdk"
-version = "0.6.0-preview.1"
+version = "1.0.0"
 description = "Official Python SDK for WAU-core-kernel — AI agent dispatch"
 readme = "README.md"
 license = { text = "MIT" }
