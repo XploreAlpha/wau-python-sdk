@@ -1,14 +1,16 @@
 # wau-python-sdk
 
-> **WAU Python SDK v0.6.0-preview.1** — 官方 Python 客户端,WAU-core-kernel 智能调度内核接入入口
+> **WAU Python SDK v1.0.0 GA** — 官方 Python 客户端,WAU-core-kernel 智能调度内核接入入口
+> v0.7.0 "Amber" 🔷 — **v1.0.0 = 2026-06-19 GA**(M3 W6 完成,2026-07-25 W7.7 文档校准)
 
 [![PyPI](https://badge.fury.io/py/wau-sdk.svg)](https://pypi.org/project/wau-sdk/)
+[![Version](https://img.shields.io/badge/version-v1.0.0-blue?style=flat-square)](https://pypi.org/project/wau-sdk/)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 ## 状态
 
-✅ **v0.6.0-preview.1** (W6 实施完成,2026-06-13 启动,06-14 完)
+✅ **v1.0.0 GA** (2026-06-19 → 2026-07-25 W7.7 文档校准) — **Public API stable**
 
 | 阶段 | 估时(plan §5.5) | 实际 | 状态 |
 |---|---|---|---|
@@ -18,14 +20,15 @@
 | W6.10 测试 (95 单测 + 5 场景契约 + 88% 覆盖率) | 1 d | ~0.5 d | ✅ |
 | W6.10-3 CI workflow (pytest + ruff + mypy + coverage) | 0.5 d | ~0.1 d | ✅ |
 | W6.11 docs (4 文档) + 4 examples | 0.5 d | ~0.1 d | ✅ |
-| W6.12 tag v0.6.0-preview.1 + 发 PyPI | 0.5 d | 待你手动 | ⏳ |
+| W7.7 Public API stable + deprecation policy 文档校准 | 0.05 d | ~0.05 d | ✅ |
+| tag v1.0.0 + 发 PyPI | 0.5 d | ⏳ 用户手动(已 tag,发包待你) |
 
 **实际完成 ~1.7d(估时 5d,提前 3.3d)**
 
 ## 安装
 
 ```bash
-pip install wau-sdk==0.6.0-preview.1
+pip install wau-sdk==1.0.0
 ```
 
 ## 5 分钟快速开始
