@@ -34,6 +34,12 @@ class Agent:
     description: str = ""
     skills: list[str] = field(default_factory=list)
     universes: list[str] = field(default_factory=list)
+    # universe_labels K8s-style labels(per universe,v0.8.0 M3-2B 新增)
+    #   - 业务分组用 universes(原字段,保持向后兼容)
+    #   - 资源 / 调度特征用 universe_labels(新字段)
+    #   - 老 client 不传 → 空 dict(server 视为空)
+    #   - 字段名跟 afp-protocol v0.2 + WAU-core-kernel proto + wau-go-sdk 1:1 对齐
+    universe_labels: dict[str, str] = field(default_factory=dict)
     trust: float = 0.0
     status: str = ""
     lastSeen: str = ""
@@ -75,6 +81,8 @@ class AgentRegisterRequest:
     description: str = ""
     skills: list[str] = field(default_factory=list)
     universes: list[str] = field(default_factory=list)
+    # universe_labels 跟 Agent.universe_labels 字段语义一致(v0.8.0 M3-2B 新增)
+    universe_labels: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
