@@ -60,6 +60,14 @@ from wau_sdk.types import (
     Candidate,
     IntentDTO,
 )
+# v0.8.0 M3-2B 新增
+from wau_sdk.universe_labels import (
+    LabelsValidationResult,
+    RESERVED_UNIVERSE_LABEL_KEYS,
+    is_reserved_label_key,
+    validate_universe_labels,
+    log_labels_validation,
+)
 
 __version__ = "0.6.0-preview.1"
 
@@ -101,5 +109,11 @@ __all__ = [
     "DecisionInfo",
     "Candidate",
     "IntentDTO",
+    # v0.8.0 M3-2B
+    "LabelsValidationResult",
+    "RESERVED_UNIVERSE_LABEL_KEYS",
+    "is_reserved_label_key",
+    "validate_universe_labels",
+    "log_labels_validation",
     "__version__",
 ]
