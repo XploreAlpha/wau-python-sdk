@@ -176,3 +176,61 @@ class IntentDTO:
     requiredSkills: list[str] = field(default_factory=list)
     urgency: str = ""
     estimatedComplexity: int = 0
+
+
+# v0.8.0 M5-1 B.1 — Handshake DTO
+# 字段 1:1 对齐 kernel internal/handshake/session.go:92-142
+
+
+@dataclass
+class HandshakeRequest:
+    """POST /v0.8.0/handshake/sessions 请求体
+
+    必填: tenant_id, agent_id(client_id 不填时自动用 SDK user_agent)
+    可选: protocol(默认 "a2a"), universe
+    """
+    tenant_id: str
+    client_id: str = ""
+    agent_id: str = ""
+    protocol: str = "a2a"
+    universe: str = ""
+
+
+@dataclass
+class HandshakeResponse:
+    """POST /v0.8.0/handshake/sessions 响应(6 字段)
+
+    复用判断: reused=True 表示 kernel 命中已存在 session。
+    """
+    session_id: str
+    direct_endpoint: str
+    protocol: str
+    expires_at: str  # RFC3339
+    ttl_seconds: int
+    reused: bool
+
+
+@dataclass
+class HandshakeSessionDetail:
+    """GET /v0.8.0/handshake/sessions/{id} 响应(11 字段)"""
+    session_id: str
+    tenant_id: str
+    client_id: str
+    agent_id: str
+    direct_endpoint: str
+    protocol: str
+    trust_score: float = 0.0
+    created_at: str = ""
+    expires_at: str = ""
+    ttl_seconds: int = 0
+    reuse_count: int = 0
+
+
+@dataclass
+class HandshakeStats:
+    """GET /admin/handshake/stats 响应"""
+    total_sessions: int = 0
+    total_reuses: int = 0
+    reuse_hit_rate: float = 0.0
+    active_sessions: int = 0
+    per_tenant: dict = field(default_factory=dict)

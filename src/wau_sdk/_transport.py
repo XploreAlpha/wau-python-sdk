@@ -24,6 +24,15 @@ from wau_sdk._errors import (
     BadRequestError,
     ConflictError,
     ForbiddenError,
+    HandshakeAgentNoEndpointError,
+    HandshakeAgentNotFoundError,
+    HandshakeInsufficientTrustError,
+    HandshakeInvalidProtocolError,
+    HandshakeInvalidRequestError,
+    HandshakeProtocolNotSupportedError,
+    HandshakeRateLimitedError,
+    HandshakeSessionNotFoundError,
+    HandshakeTenantMismatchError,
     NotFoundError,
     UnauthorizedError,
 )
@@ -40,6 +49,21 @@ _STATUS_MAP: dict[int, type[APIError]] = {
     403: ForbiddenError,
     404: NotFoundError,
     409: ConflictError,
+}
+
+# v0.8.0 M5-1 B.1 — Handshake 错误码 → 错误类映射
+_HANDSHAKE_PATH_KEY = "/handshake/"
+_HANDSHAKE_CODE_TO_CLS: dict[str, type[APIError]] = {
+    "-32001": HandshakeInsufficientTrustError,
+    "-32002": HandshakeAgentNotFoundError,
+    "-32003": HandshakeTenantMismatchError,
+    "-32004": HandshakeRateLimitedError,
+    "-32005": HandshakeProtocolNotSupportedError,
+    "-32600": HandshakeInvalidRequestError,  # JSON-RPC invalid request
+    "SESSION_NOT_FOUND": HandshakeSessionNotFoundError,
+    "AGENT_NO_ENDPOINT": HandshakeAgentNoEndpointError,
+    "INVALID_PROTOCOL": HandshakeInvalidProtocolError,
+    "INVALID_REQUEST": HandshakeInvalidRequestError,
 }
 
 
@@ -137,16 +161,34 @@ class Transport:
             ) from e
 
     def _raise_for_status(self, resp: httpx.Response) -> None:
-        """根据状态码抛对应 APIError"""
-        err_cls = _STATUS_MAP.get(resp.status_code, APIError)
+        """根据状态码抛对应 APIError
+
+        v0.8.0 M5-1 B.1:握手端点(/handshake/)优先用 Handshake*Error 子类映射。
+        """
         request_id = resp.headers.get("X-Request-ID", "")
         try:
             body_dict = resp.json()
             message = body_dict.get("error") or body_dict.get("message") or ""
-            code = body_dict.get("code", "")
+            # code 可能在 error.code(嵌套)或顶层 code 字段
+            err_obj = body_dict.get("error", {})
+            code = ""
+            if isinstance(err_obj, dict):
+                code = str(err_obj.get("code", ""))
+            if not code:
+                code = str(body_dict.get("code", ""))
         except Exception:
             message = resp.text[:200]
             code = ""
+
+        # 握手端点 → 用 Handshake*Error
+        err_cls: type[APIError] = APIError
+        if _HANDSHAKE_PATH_KEY in str(resp.request.url):
+            # 优先按 body 里的 code 字符串匹配(整数 code 也转字符串)
+            err_cls = _HANDSHAKE_CODE_TO_CLS.get(code, APIError)
+        # 兜底:用 _STATUS_MAP(非握手端点)
+        if err_cls is APIError:
+            err_cls = _STATUS_MAP.get(resp.status_code, APIError)
+
         # 全部用关键字参数(子类形参顺序不同,关键字最安全)
         raise err_cls(
             status_code=resp.status_code,

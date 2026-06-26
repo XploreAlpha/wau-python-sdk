@@ -41,6 +41,15 @@ from wau_sdk._errors import (
     CircuitOpenError,
     MaxRetriesError,
     NotImplementedError as WauNotImplementedError,  # avoid name clash with builtin
+    HandshakeInsufficientTrustError,  # v0.8.0 M5-1 B.1
+    HandshakeAgentNotFoundError,
+    HandshakeTenantMismatchError,
+    HandshakeRateLimitedError,
+    HandshakeProtocolNotSupportedError,
+    HandshakeSessionNotFoundError,
+    HandshakeAgentNoEndpointError,
+    HandshakeInvalidProtocolError,
+    HandshakeInvalidRequestError,
 )
 from wau_sdk.types import (
     HealthResponse,
@@ -59,6 +68,10 @@ from wau_sdk.types import (
     DecisionInfo,
     Candidate,
     IntentDTO,
+    HandshakeRequest,  # v0.8.0 M5-1 B.1
+    HandshakeResponse,
+    HandshakeSessionDetail,
+    HandshakeStats,
 )
 # v0.8.0 M3-2B 新增
 from wau_sdk.universe_labels import (
@@ -115,5 +128,19 @@ __all__ = [
     "is_reserved_label_key",
     "validate_universe_labels",
     "log_labels_validation",
+    # v0.8.0 M5-1 B.1 — Handshake
+    "HandshakeRequest",
+    "HandshakeResponse",
+    "HandshakeSessionDetail",
+    "HandshakeStats",
+    "HandshakeInsufficientTrustError",
+    "HandshakeAgentNotFoundError",
+    "HandshakeTenantMismatchError",
+    "HandshakeRateLimitedError",
+    "HandshakeProtocolNotSupportedError",
+    "HandshakeSessionNotFoundError",
+    "HandshakeAgentNoEndpointError",
+    "HandshakeInvalidProtocolError",
+    "HandshakeInvalidRequestError",
     "__version__",
 ]

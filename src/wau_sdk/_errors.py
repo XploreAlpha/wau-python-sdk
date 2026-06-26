@@ -114,6 +114,18 @@ ForbiddenError = _make_api_error_subclass("ForbiddenError", 403, "forbidden")
 BadRequestError = _make_api_error_subclass("BadRequestError", 400, "bad_request")
 ConflictError = _make_api_error_subclass("ConflictError", 409, "conflict")
 
+# v0.8.0 M5-1 B.1 — 9 个 Handshake 错误子类(per plan §A.2)
+# 用 errors.Is 不可行(子类 __hash__ 只用 status_code),用 isinstance 判
+HandshakeInsufficientTrustError = _make_api_error_subclass("HandshakeInsufficientTrustError", 403, "INSUFFICIENT_TRUST")
+HandshakeAgentNotFoundError = _make_api_error_subclass("HandshakeAgentNotFoundError", 404, "AGENT_NOT_FOUND")
+HandshakeTenantMismatchError = _make_api_error_subclass("HandshakeTenantMismatchError", 403, "TENANT_MISMATCH")
+HandshakeRateLimitedError = _make_api_error_subclass("HandshakeRateLimitedError", 429, "RATE_LIMITED")
+HandshakeProtocolNotSupportedError = _make_api_error_subclass("HandshakeProtocolNotSupportedError", 400, "PROTOCOL_NOT_SUPPORTED")
+HandshakeSessionNotFoundError = _make_api_error_subclass("HandshakeSessionNotFoundError", 404, "SESSION_NOT_FOUND")
+HandshakeAgentNoEndpointError = _make_api_error_subclass("HandshakeAgentNoEndpointError", 404, "AGENT_NO_ENDPOINT")
+HandshakeInvalidProtocolError = _make_api_error_subclass("HandshakeInvalidProtocolError", 400, "INVALID_PROTOCOL")
+HandshakeInvalidRequestError = _make_api_error_subclass("HandshakeInvalidRequestError", 400, "INVALID_REQUEST")
+
 
 class CircuitOpenError(WauError):
     """熔断开 — kernel 服务暂不可用,30s 后 HalfOpen 恢复"""
