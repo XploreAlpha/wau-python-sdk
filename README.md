@@ -97,6 +97,49 @@ pytest -m contract
 - [M3 计划](/home/inamoto888/.claude/plans/lexical-orbiting-nova.md)
 - [wau-go-sdk 架构决策 (ADR-0001~0004)](https://github.com/XploreAlpha/wau-go-sdk/tree/main/docs/adr)
 
+## v0.9.0 "Acorn" 收口段(2026-09-15 GA)
+
+上文介绍 v0.7.0 计划 + ADR 链接。本段为 v0.9.0 GA 增量补充。
+
+### 角色
+
+| OS 类比 | Client SDK(Python,开发者入口)|
+|---|---|
+| 部署 | Python package,PyPI 发布 |
+| 通信 | gRPC → wau-llm-router :18404 + wau-channel webhook |
+| 状态 | v1.1.0 同步发版(2026-07-13)|
+
+### v0.9.0 新增
+
+- **直连 wau-llm-router**(per [[project-v0-9-0-M3-§3.7-chat-sdk-4langs-2026-06-30]])
+- **bot/ 字段 5/5 对齐 4 SDK**(per [[project-v0-9-0-stage0-closure-2026-06-28]])
+- **Python 风格 API**:async / await + dict 类型友好
+
+### 5 行 Python bot
+
+```python
+import os
+from wau_python_sdk.bot.telegram import Bot
+
+bot = Bot(token=os.environ["TELEGRAM_BOT_TOKEN"], tenant_id="acme")
+bot.start()  # blocking
+```
+
+### v0.9.0 "Acorn" 5 份核心文档
+
+| # | 文件 | 内容 |
+|---|---|---|
+| 1 | [README.md](README.md)(本文件)| SDK 入口 |
+| 2 | [QUICKSTART.md](QUICKSTART.md) | 15 分钟跑通 bot |
+| 3 | [DEPLOY.md](DEPLOY.md) | PyPI 发布 |
+| 4 | [ARCHITECTURE.md](ARCHITECTURE.md) | 模块 + 4 SDK 对齐 |
+| 5 | [CHANGELOG.md](CHANGELOG.md) | v0.7.0 + v1.1.0 倒序(114 行已存在)|
+
+### 历史锚点
+
+- v1.1.0 SDK 同步发版(per [[project-v0.8.0-GA-2026-07-13]])
+- 4 SDK 一致(per [[project-v0-9-0-M3-§3.7-chat-sdk-4langs-2026-06-30]])
+
 ## 协议
 
 MIT © 2026 youhaoxi
