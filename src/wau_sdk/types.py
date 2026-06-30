@@ -234,3 +234,66 @@ class HandshakeStats:
     reuse_hit_rate: float = 0.0
     active_sessions: int = 0
     per_tenant: dict = field(default_factory=dict)
+
+
+# ============== Chat / LLM DTO(v0.9.0 M3 §3.7 新增,per D20 architecture-pivot)==============
+# 字段 1:1 对齐 OpenAI Chat Completions API + wau-go-sdk Chat DTO,
+# 4 SDK 通用,test mock 跟真 wau-edge 字节级兼容(per M2 §2.5 端到端 mock 验证)。
+
+
+@dataclass
+class ChatMessage:
+    """One message in a chat conversation (OpenAI compat)."""
+    role: str
+    content: str
+    name: str = ""
+
+
+@dataclass
+class ChatCompletionRequest:
+    """OpenAI 兼容的 chat request。
+
+    Model: 必填(如 "gpt-4o-mini" / "claude-haiku"),空时 wau-edge 走 default_model。
+    Messages: 必填 ≥ 1 条 user 消息。
+    Stream: 雏形期只支持 false(M3 §3.7 续支持 streaming)。
+    Universe: 业务分组(透传到 wau-llm-router + new-api),非必填,默认 "default"。
+    """
+    model: str
+    messages: list = field(default_factory=list)  # list[ChatMessage]
+    stream: bool = False
+    universe: str = ""
+    metadata: dict = field(default_factory=dict)
+    temperature: float | None = None
+    max_tokens: int = 0
+
+
+@dataclass
+class ChatChoice:
+    """OpenAI 兼容 choice(per wau-go-sdk)"""
+    index: int = 0
+    message: ChatMessage = field(default_factory=lambda: ChatMessage(role="", content=""))
+    finish_reason: str = ""
+
+
+@dataclass
+class ChatUsage:
+    """OpenAI 兼容 token usage"""
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+
+@dataclass
+class ChatCompletionResponse:
+    """OpenAI 兼容 chat response。
+
+    字段 1:1 对齐 wau-go-sdk ChatCompletionResponse;wau-edge 串联 wau-llm-router / new-api
+    后字节级兼容(per M2 §2.5)。
+    """
+    id: str = ""
+    object: str = "chat.completion"
+    created: int = 0
+    model: str = ""
+    choices: list = field(default_factory=list)  # list[ChatChoice]
+    usage: ChatUsage = field(default_factory=ChatUsage)
+    reason: str = ""  # WAU 扩展,wau-llm-router 决策原因

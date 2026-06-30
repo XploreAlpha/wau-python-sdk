@@ -72,6 +72,11 @@ from wau_sdk.types import (
     HandshakeResponse,
     HandshakeSessionDetail,
     HandshakeStats,
+    ChatMessage,  # v0.9.0 M3 §3.7
+    ChatCompletionRequest,
+    ChatChoice,
+    ChatUsage,
+    ChatCompletionResponse,
 )
 # v0.8.0 M3-2B 新增
 from wau_sdk.universe_labels import (
@@ -142,5 +147,11 @@ __all__ = [
     "HandshakeAgentNoEndpointError",
     "HandshakeInvalidProtocolError",
     "HandshakeInvalidRequestError",
+    # v0.9.0 M3 §3.7 — Chat
+    "ChatMessage",
+    "ChatCompletionRequest",
+    "ChatChoice",
+    "ChatUsage",
+    "ChatCompletionResponse",
     "__version__",
 ]

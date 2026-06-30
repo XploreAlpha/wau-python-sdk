@@ -16,6 +16,7 @@ from wau_sdk._options import ClientOptions, default_options
 from wau_sdk._retry import AsyncRetrier, Retrier
 from wau_sdk._transport import AsyncTransport, Transport
 from wau_sdk.agents import AgentsService, AsyncAgentsService
+from wau_sdk.chat import AsyncChatService, ChatService  # v0.9.0 M3 §3.7
 from wau_sdk.handshake import AsyncHandshakeService, HandshakeService  # v0.8.0 M5-1 B.1
 from wau_sdk.intent import AsyncIntentService, IntentService
 from wau_sdk.kernel import AsyncKernelService, KernelService
@@ -68,6 +69,7 @@ class Client:
         self.tasks = TasksService(self)
         self.intent = IntentService()
         self.handshake = HandshakeService(self)  # v0.8.0 M5-1 B.1
+        self.chat = ChatService(self)  # v0.9.0 M3 §3.7
 
     @property
     def base_url(self) -> str:
@@ -135,6 +137,7 @@ class AsyncClient:
         self.tasks = AsyncTasksService(self)
         self.intent = AsyncIntentService()
         self.handshake = AsyncHandshakeService(self)  # v0.8.0 M5-1 B.1
+        self.chat = AsyncChatService(self)  # v0.9.0 M3 §3.7
 
     @property
     def base_url(self) -> str:
