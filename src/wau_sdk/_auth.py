@@ -2,12 +2,17 @@
 
 JWT 结构:
 {
-  "agent": "my-agent",
-  "role":  "trusted_agent",
-  "iat":   1718342400,
-  "exp":   1718342700,    # iat + 300s (5 min)
-  "jti":   "uuid-v4"
+  "agent":     "my-agent",
+  "role":      "trusted_agent",
+  "sub":       "user-id-or-agent",
+  "tenant_id": "tenant-A",
+  "iat":       1718342400,
+  "exp":       1718342700,    # iat + 300s (5 min)
+  "jti":       "uuid-v4"
 }
+
+per Stage 3.1 #1 修复(2026-07-01):wau-edge Claims 必填 tenant_id(per
+wau-edge/internal/auth/jwt.go:96-98),SDK 必须签。Subject 对齐 sub claim。
 """
 
 from __future__ import annotations
@@ -28,8 +33,13 @@ class Signer:
             raise ValueError("wau: auth.shared_secret is required for HS256")
         if not auth.agent_name:
             raise ValueError("wau: auth.agent_name is required")
+        if not auth.tenant_id:
+            raise ValueError("wau: auth.tenant_id is required (wau-edge Claims 必填)")
         self._secret = auth.shared_secret
         self._agent_name = auth.agent_name
+        self._tenant_id = auth.tenant_id
+        # Subject 兜底:空时用 agent_name(per Go SDK 同款兜底)
+        self._subject = auth.subject or auth.agent_name
         self._role = auth.role.value if hasattr(auth.role, "value") else str(auth.role)
 
     @property
@@ -51,6 +61,8 @@ class Signer:
         payload: dict[str, Any] = {
             "agent": self._agent_name,
             "role": self._role,
+            "sub": self._subject,
+            "tenant_id": self._tenant_id,
             "iat": now,
             "exp": now + ttl_seconds,
             "jti": str(uuid.uuid4()),

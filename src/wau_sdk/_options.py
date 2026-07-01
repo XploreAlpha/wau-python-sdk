@@ -49,9 +49,15 @@ class AuthConfig:
 
     exp: 5 分钟(短;每次请求新签)
     jti: UUID v4 防重放
+
+    per Stage 3.1 #1 修复(2026-07-01):wau-edge Claims 必填 tenant_id(per
+    wau-edge/internal/auth/jwt.go:96-98)。SDK 必须签 tenant_id,否则 401。
+    Subject 对齐 wau-edge Claims.Subject(sub claim),缺省用 agent_name 兜底。
     """
     role: Role = Role.EXTERNAL_AGENT
     agent_name: str = ""
+    tenant_id: str = ""  # 租户 ID(必填,wau-edge 必校验,空字符串 = Signer 构造时 raise)
+    subject: str = ""  # JWT 'sub' claim(可选;空 = 用 agent_name 兜底)
     shared_secret: bytes = b""
 
     def __post_init__(self) -> None:
@@ -59,6 +65,8 @@ class AuthConfig:
             raise ValueError("shared_secret is required for HS256")
         if not self.agent_name:
             raise ValueError("agent_name is required")
+        if not self.tenant_id:
+            raise ValueError("tenant_id is required (wau-edge Claims 必填)")
 
 
 @dataclass

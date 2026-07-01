@@ -100,7 +100,7 @@ def test_transport_sets_bearer_token_when_auth_enabled(mock_kernel: respx.MockRo
     mock_kernel.get("/health").mock(side_effect=capture_handler)
 
     with wau_sdk.Client("http://mock-kernel:18400", ClientOptions(
-        auth=AuthConfig(agent_name="test", shared_secret=b"test-secret-32-bytes-long-xxxxx", role=Role.TRUSTED_AGENT),
+        auth=AuthConfig(agent_name="test", tenant_id="test-tenant", shared_secret=b"test-secret-32-bytes-long-xxxxx", role=Role.TRUSTED_AGENT),
         circuit=CircuitConfig(enabled=False),
     )) as c:
         c.agents.health()
