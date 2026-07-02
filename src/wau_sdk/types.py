@@ -297,3 +297,53 @@ class ChatCompletionResponse:
     choices: list = field(default_factory=list)  # list[ChatChoice]
     usage: ChatUsage = field(default_factory=ChatUsage)
     reason: str = ""  # WAU 扩展,wau-llm-router 决策原因
+
+
+# ============== Streaming SSE DTO(per Stage 3.1 #10, 2026-07-02)==============
+#
+# OpenAI ChatCompletionChunk 协议 1:1 对齐(per https://platform.openai.com/docs/api-reference/chat-streaming)。
+# 4 SDK 通用字段(per Stage 0 4 SDK 5/5 字段对齐)。
+#
+# 完整链路(per Stage 3.1 #10):
+#   SDK → wau-edge :18402 /v1/chat/completions?stream=true
+#       → wau-llm-router :18404 Resolve(unary, 拿 userToken + model)
+#       → new-api sidecar :3000 /v1/chat/completions?stream=true
+#       → DeepSeek v4-flash reasoning model → SSE chunks → 响应回 SDK
+
+
+@dataclass
+class ChunkDelta:
+    """OpenAI ChatCompletionChunk.choices[].delta 对象。
+
+    - role 只在首 chunk 有值("assistant"),空串时 omit
+    - content 是增量字符流(wau-edge 7 chunks 验证 per C.1:"1" → "+" → "1" → "=" → "2")
+    """
+    role: str = ""
+    content: str = ""
+
+
+@dataclass
+class ChunkChoice:
+    """OpenAI ChatCompletionChunk.choices[] 元素。
+
+    finish_reason 字段在流中间为 None(per OpenAI 协议),结束 chunk 为 "stop" / "length"。
+    用 Optional[str] + 序列化时 None 转 None,严格对齐 OpenAI spec。
+    """
+    index: int = 0
+    delta: ChunkDelta = field(default_factory=ChunkDelta)
+    finish_reason: str | None = None
+
+
+@dataclass
+class ChatCompletionChunk:
+    """OpenAI ChatCompletion streaming 响应的一个 chunk(per wau-edge stream.go)。
+
+    wau-edge handler.go handleStream (L204-273) 编码这种格式,SSE 包装为:
+      data: {<JSON>}\\n\\n
+    终止:data: [DONE]\\n\\n(per stream.go WriteDone)
+    """
+    id: str = ""
+    object: str = "chat.completion.chunk"
+    created: int = 0
+    model: str = ""
+    choices: list = field(default_factory=list)  # list[ChunkChoice]

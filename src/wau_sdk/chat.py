@@ -6,6 +6,12 @@
 
 沿用 handshake.py 同步+异步双版本模式 + HandshakeError 错误码处理。
 
+流式(SSE):Stage 3.1 #10 (2026-07-02) 实装 — c.chat.stream(req) 返回
+  AsyncIterator[ChatCompletionChunk](或同步 Iterator[ChatCompletionChunk])。
+  底层用 httpx.AsyncClient.stream / httpx.Client.stream 读 SSE
+  (data: {json}\\n\\n + data: [DONE]\\n\\n 终止)。
+  **不含 Telegram bot 流式**(Telegram Bot API 限制,推 v1.0.0+)。
+
 完整链路(per M3 §4.5.1):
   bot → wau-edge :18402 /v1/chat/completions
        → wau-llm-router :18403 /v1/resolve(决定 userToken + model)
@@ -14,15 +20,83 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import json
+from typing import TYPE_CHECKING, Any, Iterator
 
 from wau_sdk.types import (
     ChatCompletionRequest,
     ChatCompletionResponse,
+    ChatCompletionChunk,
+    ChunkChoice,
+    ChunkDelta,
 )
 
 if TYPE_CHECKING:
     pass
+
+
+def _build_body(req: ChatCompletionRequest) -> dict:
+    """把 ChatCompletionRequest 序列化为 OpenAI 兼容 body(同步 / 异步共用)"""
+    body: dict = {
+        "model": req.model,
+        "messages": [
+            {k: v for k, v in {
+                "role": m.role,
+                "content": m.content,
+                "name": m.name,
+            }.items() if v}
+            for m in req.messages
+        ],
+    }
+    if req.stream:
+        body["stream"] = True
+    if req.universe:
+        body["universe"] = req.universe
+    if req.metadata:
+        body["metadata"] = req.metadata
+    if req.temperature is not None:
+        body["temperature"] = req.temperature
+    if req.max_tokens > 0:
+        body["max_tokens"] = req.max_tokens
+    return body
+
+
+def _parse_choices(choices_data: list[dict]) -> list:
+    """解析 choices JSON → list[ChatChoice](同步 / 异步共用)"""
+    return [
+        {
+            "index": c.get("index", 0),
+            "message": {
+                "role": c.get("message", {}).get("role", ""),
+                "content": c.get("message", {}).get("content", ""),
+                "name": c.get("message", {}).get("name", ""),
+            },
+            "finish_reason": c.get("finish_reason", ""),
+        }
+        for c in choices_data
+    ]
+
+
+def _parse_chunk(payload: str) -> ChatCompletionChunk:
+    """解析 SSE chunk payload → ChatCompletionChunk(同步 / 异步共用)"""
+    data = json.loads(payload)
+    return ChatCompletionChunk(
+        id=data.get("id", ""),
+        object=data.get("object", "chat.completion.chunk"),
+        created=data.get("created", 0),
+        model=data.get("model", ""),
+        choices=[
+            ChunkChoice(
+                index=c.get("index", 0),
+                delta=ChunkDelta(
+                    role=c.get("delta", {}).get("role", ""),
+                    content=c.get("delta", {}).get("content", ""),
+                ),
+                finish_reason=c.get("finish_reason"),
+            )
+            for c in data.get("choices", [])
+        ],
+    )
 
 
 class ChatService:
@@ -36,6 +110,16 @@ class ChatService:
                 messages=[ChatMessage(role="user", content="hello")],
             ))
             print(resp.choices[0].message.content)
+
+            # Stage 3.1 #10 SSE 流式
+            for chunk in c.chat.stream(ChatCompletionRequest(
+                model="deepseek-v4-flash",
+                messages=[ChatMessage(role="user", content="1+1=?")],
+                stream=True,
+            )):
+                print(chunk.choices[0].delta.content, end="")
+                if chunk.choices[0].finish_reason == "stop":
+                    break
     """
 
     def __init__(self, client) -> None:  # type: ignore[name-defined]  # noqa: F821
@@ -43,7 +127,7 @@ class ChatService:
         self._options = client.options
 
     def completions(self, req: ChatCompletionRequest) -> ChatCompletionResponse:
-        """POST /v1/chat/completions
+        """POST /v1/chat/completions(非流式)
 
         :raises ValueError: Model / Messages 客户端校验失败
         :raises APIError: HTTP 4xx/5xx(wau-edge 错误码透传)
@@ -52,43 +136,10 @@ class ChatService:
             raise ValueError("ChatCompletionRequest.model is required")
         if not req.messages:
             raise ValueError("ChatCompletionRequest.messages must not be empty")
-        # 序列化: dataclass → dict
-        body: dict = {
-            "model": req.model,
-            "messages": [
-                {k: v for k, v in {
-                    "role": m.role,
-                    "content": m.content,
-                    "name": m.name,
-                }.items() if v}
-                for m in req.messages
-            ],
-        }
-        if req.stream:
-            body["stream"] = True
-        if req.universe:
-            body["universe"] = req.universe
-        if req.metadata:
-            body["metadata"] = req.metadata
-        if req.temperature is not None:
-            body["temperature"] = req.temperature
-        if req.max_tokens > 0:
-            body["max_tokens"] = req.max_tokens
+        body = _build_body(req)
 
         data = self._transport.request("POST", "/v1/chat/completions", body=body)
-        # 解析响应: dict → dataclass
-        choices = [
-            {
-                "index": c.get("index", 0),
-                "message": {
-                    "role": c.get("message", {}).get("role", ""),
-                    "content": c.get("message", {}).get("content", ""),
-                    "name": c.get("message", {}).get("name", ""),
-                },
-                "finish_reason": c.get("finish_reason", ""),
-            }
-            for c in data.get("choices", [])
-        ]
+        choices = _parse_choices(data.get("choices", []))
         usage_data = data.get("usage", {})
         return ChatCompletionResponse(
             id=data.get("id", ""),
@@ -103,6 +154,60 @@ class ChatService:
             },
             reason=data.get("reason", ""),
         )
+
+    def stream(self, req: ChatCompletionRequest) -> Iterator[ChatCompletionChunk]:
+        """POST /v1/chat/completions?stream=true 以 SSE 流式返回 ChatCompletionChunk。
+
+        Per Stage 3.1 #10 (2026-07-02):
+        - 强制 req.stream = True(防误用)
+        - 复用 self._transport._http (httpx.Client)
+        - Accept: text/event-stream
+        - SSE 协议: data: {json}\\n\\n + data: [DONE]\\n\\n 终止
+
+        Args:
+            req: ChatCompletionRequest(必须 stream=True)
+
+        Yields:
+            ChatCompletionChunk,直到 FinishReason="stop" / "length" 或 [DONE] 终止
+
+        Raises:
+            ValueError: 客户端校验失败(model / messages 空)
+            APIError: HTTP 4xx/5xx(wau-edge 错误码透传)
+            httpx.RequestError: 网络错
+            json.JSONDecodeError: SSE chunk JSON 解析失败
+        """
+        if not req.model:
+            raise ValueError("ChatCompletionRequest.model is required")
+        if not req.messages:
+            raise ValueError("ChatCompletionRequest.messages must not be empty")
+        req.stream = True
+        body = _build_body(req)
+
+        # 鉴权(沿用 Transport._build_headers 模式)
+        headers: dict[str, str] = {
+            "User-Agent": self._options.user_agent,
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+        }
+        if self._transport._signer is not None:
+            headers["Authorization"] = f"Bearer {self._transport._signer.sign()}"
+
+        url = "/v1/chat/completions"
+        body_bytes = json.dumps(body, default=str).encode("utf-8")
+
+        with self._transport._http.stream("POST", url, content=body_bytes, headers=headers) as resp:
+            if resp.status_code >= 400:
+                # 4xx/5xx 走 application/json(非 SSE),由 _raise_for_status 翻译
+                self._transport._raise_for_status(resp)
+                return  # 不应到达,仅为类型检查
+
+            for line in resp.iter_lines():
+                if not line.startswith("data: "):
+                    continue
+                payload = line[len("data: "):]
+                if payload == "[DONE]":
+                    return
+                yield _parse_chunk(payload)
 
 
 class AsyncChatService:
@@ -117,41 +222,10 @@ class AsyncChatService:
             raise ValueError("ChatCompletionRequest.model is required")
         if not req.messages:
             raise ValueError("ChatCompletionRequest.messages must not be empty")
-        body: dict = {
-            "model": req.model,
-            "messages": [
-                {k: v for k, v in {
-                    "role": m.role,
-                    "content": m.content,
-                    "name": m.name,
-                }.items() if v}
-                for m in req.messages
-            ],
-        }
-        if req.stream:
-            body["stream"] = True
-        if req.universe:
-            body["universe"] = req.universe
-        if req.metadata:
-            body["metadata"] = req.metadata
-        if req.temperature is not None:
-            body["temperature"] = req.temperature
-        if req.max_tokens > 0:
-            body["max_tokens"] = req.max_tokens
+        body = _build_body(req)
 
         data = await self._transport.request("POST", "/v1/chat/completions", body=body)
-        choices = [
-            {
-                "index": c.get("index", 0),
-                "message": {
-                    "role": c.get("message", {}).get("role", ""),
-                    "content": c.get("message", {}).get("content", ""),
-                    "name": c.get("message", {}).get("name", ""),
-                },
-                "finish_reason": c.get("finish_reason", ""),
-            }
-            for c in data.get("choices", [])
-        ]
+        choices = _parse_choices(data.get("choices", []))
         usage_data = data.get("usage", {})
         return ChatCompletionResponse(
             id=data.get("id", ""),
@@ -166,3 +240,39 @@ class AsyncChatService:
             },
             reason=data.get("reason", ""),
         )
+
+    async def stream(self, req: ChatCompletionRequest):
+        """异步 SSE 流式版本 — 返回 AsyncIterator[ChatCompletionChunk]。
+
+        Per Stage 3.1 #10:用 httpx.AsyncClient.stream + aiter_lines
+        """
+        if not req.model:
+            raise ValueError("ChatCompletionRequest.model is required")
+        if not req.messages:
+            raise ValueError("ChatCompletionRequest.messages must not be empty")
+        req.stream = True
+        body = _build_body(req)
+
+        headers: dict[str, str] = {
+            "User-Agent": self._options.user_agent,
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+        }
+        if self._transport._signer is not None:
+            headers["Authorization"] = f"Bearer {self._transport._signer.sign()}"
+
+        url = "/v1/chat/completions"
+        body_bytes = json.dumps(body, default=str).encode("utf-8")
+
+        async with self._transport._http.stream("POST", url, content=body_bytes, headers=headers) as resp:
+            if resp.status_code >= 400:
+                self._transport._raise_for_status(resp)
+                return  # 不应到达
+
+            async for line in resp.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                payload = line[len("data: "):]
+                if payload == "[DONE]":
+                    return
+                yield _parse_chunk(payload)
