@@ -78,6 +78,8 @@ def test_chat_happy(edge_mock: respx.MockRouter, sync_client: wau_sdk.Client) ->
                 "total_tokens": 8,
             },
             "reason": "static:tenant=acme model=gpt-4o-mini",
+            # Stage 3.1 #11 (2026-07-03):Provider 透传 mock(provider 字段验证)
+            "provider": "deepseek-v4-flash",
         })
     )
     resp = sync_client.chat.completions(ChatCompletionRequest(
@@ -89,6 +91,8 @@ def test_chat_happy(edge_mock: respx.MockRouter, sync_client: wau_sdk.Client) ->
     assert len(resp.choices) == 1
     assert resp.choices[0]["message"]["content"] == "echo: hello"
     assert resp.reason.startswith("static:tenant=acme")
+    # Stage 3.1 #11:Provider 透传验证
+    assert resp.provider == "deepseek-v4-flash", f"provider = {resp.provider!r}, want deepseek-v4-flash"
 
 
 # ============== Case 2:empty model ==============
@@ -130,7 +134,40 @@ def test_chat_server_error_invalid_request(edge_mock: respx.MockRouter, sync_cli
     assert exc_info.value.status_code == 400
 
 
-# ============== Case 5:async happy path ==============
+# ============== Case 5:Provider 透传 (Stage 3.1 #11, 2026-07-03) ==============
+#
+# 验证:wau-edge /v1/chat/completions 响应里带 provider 字段(per LLMDecision.Provider 透传),
+#      wau-python-sdk ChatCompletionResponse.provider 字段能正确解析并暴露。
+# 兼容:老 server 不带 provider 字段 → SDK 解析为 ""(空串兜底,Python dataclass 默认值)。
+
+def test_chat_provider_passthrough(edge_mock: respx.MockRouter, sync_client: wau_sdk.Client) -> None:
+    edge_mock.post("/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={
+            "id": "chatcmpl-provider-001",
+            "object": "chat.completion",
+            "created": 1700000002,
+            "model": "claude-haiku-4-5",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "hi"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            "provider": "claude-haiku-4-5",
+        })
+    )
+    resp = sync_client.chat.completions(ChatCompletionRequest(
+        model="claude-haiku-4-5",
+        messages=[ChatMessage(role="user", content="hi")],
+    ))
+    assert resp.provider == "claude-haiku-4-5", (
+        f"provider = {resp.provider!r}, want claude-haiku-4-5 (Stage 3.1 #11 provider 透传)"
+    )
+
+
+# ============== Case 6:async happy path ==============
 
 @pytest.mark.asyncio
 async def test_chat_async_happy(edge_mock: respx.MockRouter) -> None:

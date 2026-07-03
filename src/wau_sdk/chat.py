@@ -153,6 +153,8 @@ class ChatService:
                 "total_tokens": usage_data.get("total_tokens", 0),
             },
             reason=data.get("reason", ""),
+            # Stage 3.1 #11 (2026-07-03):Provider 透传
+            provider=data.get("provider", ""),
         )
 
     def stream(self, req: ChatCompletionRequest) -> Iterator[ChatCompletionChunk]:
@@ -239,6 +241,8 @@ class AsyncChatService:
                 "total_tokens": usage_data.get("total_tokens", 0),
             },
             reason=data.get("reason", ""),
+            # Stage 3.1 #11 (2026-07-03):Provider 透传
+            provider=data.get("provider", ""),
         )
 
     async def stream(self, req: ChatCompletionRequest):
