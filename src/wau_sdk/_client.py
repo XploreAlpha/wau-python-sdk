@@ -16,6 +16,7 @@ from wau_sdk._options import ClientOptions, default_options
 from wau_sdk._retry import AsyncRetrier, Retrier
 from wau_sdk._transport import AsyncTransport, Transport
 from wau_sdk.agents import AgentsService, AsyncAgentsService
+from wau_sdk.agent_runtime import AgentRuntimeService, AsyncAgentRuntimeService  # v1.3.1 M11 P2
 from wau_sdk.chat import AsyncChatService, ChatService  # v0.9.0 M3 §3.7
 from wau_sdk.handshake import AsyncHandshakeService, HandshakeService  # v0.8.0 M5-1 B.1
 from wau_sdk.intent import AsyncIntentService, IntentService
@@ -70,6 +71,7 @@ class Client:
         self.intent = IntentService()
         self.handshake = HandshakeService(self)  # v0.8.0 M5-1 B.1
         self.chat = ChatService(self)  # v0.9.0 M3 §3.7
+        self.agent_runtime = AgentRuntimeService(self)  # v1.3.1 M11 P2
 
     @property
     def base_url(self) -> str:
@@ -91,6 +93,7 @@ class Client:
 
     def close(self) -> None:
         self._transport.close()
+        self.agent_runtime.close()
 
     def __enter__(self) -> "Client":
         return self
@@ -138,6 +141,7 @@ class AsyncClient:
         self.intent = AsyncIntentService()
         self.handshake = AsyncHandshakeService(self)  # v0.8.0 M5-1 B.1
         self.chat = AsyncChatService(self)  # v0.9.0 M3 §3.7
+        self.agent_runtime = AsyncAgentRuntimeService(self)  # v1.3.1 M11 P2
 
     @property
     def base_url(self) -> str:
@@ -155,6 +159,7 @@ class AsyncClient:
 
     async def close(self) -> None:
         await self._transport.close()
+        await self.agent_runtime.close()
 
     async def __aenter__(self) -> "AsyncClient":
         return self

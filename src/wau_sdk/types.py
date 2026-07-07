@@ -8,6 +8,133 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+# ============== Agent Runtime DTO(v1.3.1 M11 P2, 2026-07-07)==============
+#
+# per v1.0.0 M11 W4-W5 design + D67=B(Sidecar subprocess) + D69=A(agentskills.io 标准):
+#   - 字段 snake_case(Pythonic 风格)+ JSON 序列化 camelCase(跟 wau-agent Go RPC 对齐)
+#   - RunAgent: 走 wau-agent HTTP JSON-RPC gateway(端口 19408)/rpc
+#   - Skill: 走 wau-registry HTTP(端口 18401)/registry/skills/*
+#   - RegisterAgent: 走 wau-registry HTTP(端口 18401)/registry/agents(老契约,D60 兼容)
+
+
+@dataclass
+class RunAgentRequest:
+    """RunAgent RPC 入参(per wau-agent internal/rpc/server.go RunAgentArgs)
+
+    字段对齐 wau-agent net/rpc Gob(同时 HTTP JSON-RPC gateway 走 JSON 包装):
+      user_id, bot_id, prompt, context_id, timeout_sec
+    """
+    user_id: str
+    bot_id: str
+    prompt: str
+    context_id: str = ""
+    timeout_sec: int = 30
+
+
+@dataclass
+class RunAgentResponse:
+    """RunAgent RPC 出参(per wau-agent internal/rpc/server.go RunAgentReply)
+
+    字段:
+      response       — 智能体回复文本(由 hermes-agent LLM loop 生成)
+      context_id     — 会话 ID(新会话 = 服务端生成,后续回传让 hermes 续接)
+      provider       — LLM provider 名称(透传 hermes 选择,debug / audit 用)
+      tokens_used    — token 用量(prompt + completion)
+      elapsed_ms     — 实际耗时(毫秒)
+    """
+    response: str = ""
+    context_id: str = ""
+    provider: str = ""
+    tokens_used: int = 0
+    elapsed_ms: int = 0
+
+
+@dataclass
+class Skill:
+    """Skill 注册表条目(per agentskills.io 标准 + wau-registry-skill 计划表)
+
+    字段对齐 agentskills.io v1 manifest spec:
+      name, description, version, author, universe,
+      parameters(dict), entrypoint(str), source_url
+    老字段(user_id, is_builtin)WAU 扩展,C 端 / B 端 0 改。
+    """
+    name: str
+    description: str = ""
+    version: str = "0.1.0"
+    author: str = ""
+    universe: str = "default"
+    parameters: dict = field(default_factory=dict)
+    entrypoint: str = ""
+    source_url: str = ""
+    # WAU 扩展
+    user_id: str = ""  # C 端用户 ID(B 端为空)
+    is_builtin: bool = False  # 内置 skill(weather/reminder/opencalw)
+
+
+@dataclass
+class SkillListResponse:
+    """GET /registry/skills 列表响应"""
+    skills: list[Skill] = field(default_factory=list)
+    total: int = 0
+
+
+@dataclass
+class LoadSkillRequest:
+    """POST /registry/skills/load 入参(per D69=A agentskills.io load spec)"""
+    user_id: str
+    skill_name: str
+    bot_id: str = ""
+    install: bool = True  # True = install(持久化), False = load(临时)
+
+
+@dataclass
+class LoadSkillResponse:
+    """POST /registry/skills/load 出参"""
+    skill_name: str
+    loaded: bool
+    entrypoint: str = ""
+    parameters: dict = field(default_factory=dict)
+    message: str = ""
+
+
+@dataclass
+class RegisterAgentManifest:
+    """RegisterAgentManifest — agent 注册 manifest(per M11 P4 + agentskills.io)
+
+    字段 snake_case(JSON camelCase via field metadata):
+      name, description, version, entrypoint,
+      skills(list[str]), universes(list[str]),
+      parameters(dict), source_url
+
+    调用方:wau-agent daemon / SDK caller POST /registry/agents/register
+    """
+    name: str
+    description: str = ""
+    version: str = "0.1.0"
+    entrypoint: str = ""
+    skills: list[str] = field(default_factory=list)
+    universes: list[str] = field(default_factory=list)
+    parameters: dict = field(default_factory=dict)
+    source_url: str = ""
+
+
+# ============== Skill Publish DTO(v1.3.1 M11 P4 / I 子项, 2026-07-07)==============
+
+
+@dataclass
+class SkillPublishResponse:
+    """Skill Publish 响应(POST /registry/skills/publish)
+
+    字段(per wau-registry skill.go handlerPublishSkill):
+      name, version, entrypoint, bundle_size, bundle_sha
+    """
+    name: str
+    version: str
+    entrypoint: str
+    bundle_size: int = 0
+    bundle_sha: str = ""
+
+
 @dataclass
 class HealthResponse:
     status: str

@@ -77,6 +77,16 @@ from wau_sdk.types import (
     ChatChoice,
     ChatUsage,
     ChatCompletionResponse,
+    # v1.3.1 M11 P2 — Agent Runtime DTO
+    RunAgentRequest,
+    RunAgentResponse,
+    Skill,
+    SkillListResponse,
+    LoadSkillRequest,
+    LoadSkillResponse,
+    RegisterAgentManifest,
+    # v1.3.1 M11 P4 (I 子项) — Skill publish DTO
+    SkillPublishResponse,
 )
 # v0.8.0 M3-2B 新增
 from wau_sdk.universe_labels import (
@@ -87,7 +97,7 @@ from wau_sdk.universe_labels import (
     log_labels_validation,
 )
 
-__version__ = "0.6.0-preview.1"
+__version__ = "1.3.1-preview.1"
 
 __all__ = [
     # Client
@@ -153,5 +163,15 @@ __all__ = [
     "ChatChoice",
     "ChatUsage",
     "ChatCompletionResponse",
+    # v1.3.1 M11 P2 — Agent Runtime DTO
+    "RunAgentRequest",
+    "RunAgentResponse",
+    "Skill",
+    "SkillListResponse",
+    "LoadSkillRequest",
+    "LoadSkillResponse",
+    "RegisterAgentManifest",
+    # v1.3.1 M11 P4 (I 子项) — Skill publish DTO
+    "SkillPublishResponse",
     "__version__",
 ]

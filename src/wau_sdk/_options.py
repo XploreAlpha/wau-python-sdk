@@ -79,6 +79,12 @@ class ClientOptions:
     user_agent: str = "wau-python-sdk/0.6.0-preview.1"
     transport: Any = None  # httpx.Client/AsyncClient 注入点(测试/代理)
 
+    # v1.3.1 M11 P4 (I 子项) — 单独配置 wau-registry HTTP base URL
+    # 默认 http://localhost:18401,与 wau-core-kernel(:18400)不同
+    # AgentRuntimeService.load_skill / register_agent / publish_agent 用这个
+    wau_registry_url: str = "http://localhost:18401"
+    wau_agent_url: str = "http://localhost:19408"
+
 
 def default_options() -> ClientOptions:
     """默认配置(Quickstart 用)"""
