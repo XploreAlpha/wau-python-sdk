@@ -1,3 +1,25 @@
+## [Unreleased] — v1.0.0 "Phoenix" M11 W8 (2026-07-08) → v1.3.1
+
+### Added
+
+#### M2 OAuth (ClientCredentials)
+- `OAuthClient` + async `OAuthClient`(token refresh + scope)
+- `ClientOptions.wau_registry_url: str = "http://localhost:18401"` additive(D60)
+- 15 unit tests PASS
+
+#### M11 P2 + P4 agent_runtime
+- `sync + async publish_agent(manifest, bundle_path) → SkillPublishResponse`
+- `SkillPublishResponse` DTO(`name, version, entrypoint, bundle_size, bundle_sha`)
+- `agent_runtime.py` 全 new service module(584 行)
+- 4 unit tests PASS
+
+### Compatibility
+
+- API 100% 保留
+- 仅 additive 新增 OAuth + publish_agent
+
+---
+
 ## [v1.2.0] - 2026-07-02 (v0.9.0 GA)
 
 ### Highlights
