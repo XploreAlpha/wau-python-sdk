@@ -146,3 +146,24 @@
 +     prompt=..., timeout_ms=30000,
 + ))
 ```
+
+## [Unreleased] — v1.0.0 "Phoenix" M10 W8 (2026-07-08)
+
+### Added
+
+#### M10 N1 — Bot 注册 DTO + BotsService 公共 ABC
+
+- `wau_sdk/bot/common/account.py`(NEW,~114 行):
+  - `Account` dataclass 字段跟 wau-go-sdk 100% 一致(per D13)
+  - `new_account(...)` factory + `public_bot_id_of(...)` helper
+  - `RegisterBotRequest` / `UpdateBotRequest` / `ListBotsFilter` dataclasses
+- `wau_sdk/bot/common/bots_service.py`(NEW,~60 行):
+  - `BotsService` ABC:register / get / update / list / delete
+  - 2 sentinel errors:`BotNotFoundError` / `BotAlreadyExistsError`
+- `wau_sdk/bot/common/__init__.py` 加 7 export
+- `wau_cli bot` 子命令保持 0 行新增(per W7 launch subtask 拍板,等子项 2 完工后加)
+
+#### Compatibility (D60)
+
+- `Bot` ABC / `IncomingMessage` / `OutgoingMessage` / `BotBuilder` 0 改
+- 字段 snake_case,D13 跨 SDK 一致
