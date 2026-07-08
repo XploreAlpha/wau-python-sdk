@@ -167,3 +167,11 @@
 
 - `Bot` ABC / `IncomingMessage` / `OutgoingMessage` / `BotBuilder` 0 改
 - 字段 snake_case,D13 跨 SDK 一致
+
+#### M4 OAuth 增强 (2026-07-08)
+- `RefreshableTokenStore.refresh_token()` 公开方法(force=True 绕过双检)
+- `RefreshableTokenStore.current_pair() -> TokenPair` dataclass
+- `PKCEClient` + `PKCEConfig` + `generate_pkce_challenge()` Authorization Code + PKCE
+- `_PKCEOnlyStore` 公共 client 路径专用 store(无 oc.refresh 兜底)
+- 0 改老 OAuthClient + 老 RefreshableTokenStore(D60 additive)
+- 4 unit tests PASS(refresh_token + PKCE challenge + URL + exchange)

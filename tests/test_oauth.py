@@ -158,3 +158,125 @@ def test_zero_impact_on_existing_sdk():
     from wau_sdk._auth import Signer  # noqa: F401
     from wau_sdk._client import Client as LegacyClient  # noqa: F401, F811
     from wau_sdk._oauth import OAuthClient  # noqa: F401
+
+# ============================================================================
+# v1.0.0 M4 OAuth 增强 (2026-07-08) tests
+# ============================================================================
+
+def test_m4_refresh_token_public_method(monkeypatch):
+    """M4:refresh_token() 公开方法,caller 显式触发"""
+    from unittest.mock import MagicMock
+    from wau_sdk import _oauth
+    call_count = [0]
+
+    def make_resp(grant, refresh=None):
+        resp = MagicMock()
+        resp.status_code = 200
+        if grant == "client_credentials":
+            resp.json.return_value = {
+                "access_token": "initial-access",
+                "token_type": "Bearer",
+                "expires_in": 3600,
+                "refresh_token": "original-refresh",
+                "scope": "read:agents",
+            }
+        else:  # refresh_token
+            assert refresh == "original-refresh", f"unexpected refresh: {refresh}"
+            resp.json.return_value = {
+                "access_token": "rotated-access-new",
+                "token_type": "Bearer",
+                "expires_in": 3600,
+                "refresh_token": "rotated-refresh-new",
+                "scope": "read:agents",
+            }
+        return resp
+
+    def mock_post(url, data=None, timeout=None):
+        call_count[0] += 1
+        grant = (data or {}).get("grant_type")
+        return make_resp(grant, refresh=(data or {}).get("refresh_token"))
+
+    # mock OAuthClient.__init__ 不做 validation,直接保存 cfg
+    orig_init = _oauth.OAuthClient.__init__
+    def patched_init(self, cfg, http=None):
+        self._cfg = cfg
+        self._http = http or MagicMock()
+    monkeypatch.setattr(_oauth.OAuthClient, "__init__", patched_init)
+
+    oc = _oauth.OAuthClient(_oauth.OAuthConfig(
+        endpoint="http://mock/oauth/token",
+        client_id="c", client_secret="s", scope="read:agents",
+    ))
+    oc._http.post = mock_post
+
+    store = oc.client_credentials()
+    assert store.access_token == "initial-access", f"got {store.access_token}"
+
+    # 显式 refresh
+    store.refresh_token()
+    pair = store.current_pair()
+    assert pair.access_token == "rotated-access-new", f"got {pair.access_token}"
+    assert pair.refresh_token == "rotated-refresh-new", f"got {pair.refresh_token}"
+
+
+def test_m4_generate_pkce_challenge():
+    """M4:PKCE challenge 幂等性 + 长度"""
+    from wau_sdk._oauth import generate_pkce_challenge
+    a = generate_pkce_challenge()
+    b = generate_pkce_challenge()
+    assert a.verifier != b.verifier
+    assert a.method == "S256"
+    assert len(a.verifier) >= 43
+    assert len(a.challenge) >= 43
+
+
+def test_m4_pkce_client_authorization_url():
+    """M4:PKCE authorization URL 构造"""
+    from wau_sdk._oauth import PKCEClient, PKCEConfig, generate_pkce_challenge
+    pc = PKCEClient(PKCEConfig(
+        auth_endpoint="https://wau.example.com/oauth/authorize",
+        token_endpoint="https://wau.example.com/oauth/token",
+        client_id="wau-sdk-pkce-test",
+        redirect_uri="https://myapp.com/callback",
+        scopes=["read:agents", "write:agents"],
+    ))
+    chal = generate_pkce_challenge()
+    url = pc.authorization_url("state-csrf-123", chal)
+    assert "response_type=code" in url
+    assert f"code_challenge={chal.challenge}" in url
+    assert "code_challenge_method=S256" in url
+    assert "state=state-csrf-123" in url
+    assert "client_id=wau-sdk-pkce-test" in url
+    # scope url-encoded: "read:agents write:agents" → "read%3Aagents+write%3Aagents" or "read%3Aagents%20write%3Aagents"
+    assert ("read%3Aagents" in url) and ("write%3Aagents" in url)
+
+
+def test_m4_pkce_client_exchange_code(monkeypatch):
+    """M4:PKCE exchange_code → RefreshableTokenStore"""
+    from unittest.mock import MagicMock
+    import wau_sdk._oauth as oauth_mod
+    from wau_sdk._oauth import PKCEClient, PKCEConfig
+
+    def mock_post(url, data=None, timeout=None):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {
+            "access_token": "pkce-access",
+            "token_type": "Bearer",
+            "expires_in": 3600,
+            "refresh_token": "pkce-refresh",
+            "scope": "read:agents",
+        }
+        return resp
+
+    monkeypatch.setattr("requests.post", mock_post)
+
+    pc = PKCEClient(PKCEConfig(
+        auth_endpoint="https://wau.example.com/oauth/authorize",
+        token_endpoint="http://mock/oauth/token",
+        client_id="wau-sdk-pkce-test",
+        redirect_uri="https://myapp.com/callback",
+        scopes=["read:agents"],
+    ))
+    store = pc.exchange_code("auth-code", "test-verifier-abc")
+    assert store.access_token == "pkce-access"
