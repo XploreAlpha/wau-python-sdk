@@ -8,6 +8,9 @@ wau-go-sdk/bot/common/account.go
 wau-typescript-sdk/src/bot/common/account.ts
 wau-rust-sdk/src/bot/common/account.rs
 必须随时保持同步,字段一字不差。
+
+v1.3.0 (W7.1, 2026-07-09) — 新加 bot_uuid (UUID v4, server-assigned)
+per D78/D79/D80 拍板;D60 additive,0 改老字段。老 bot_id slug 语义不变。
 """
 
 from __future__ import annotations
@@ -46,6 +49,12 @@ class Account:
 
     # 本地名 / slug(必填,例 "weather-cn"),tenant 内唯一
     bot_id: str = ""
+
+    # 服务端分配的 UUID v4(per D78,per tenant 全局唯一)。
+    # 与 bot_id slug 不同:bot_id = human-readable client-supplied,bot_uuid = machine-friendly server-assigned。
+    # 用途:wau-edge route 寻址 / wau-channel 8 平台 adapter 寻址 / D79 JWT 4 claims 之一。
+    # Register 响应返回(服务端决定,不接受 client 上传)。空 = 老 SDK v1.2.0 兼容降级路径。
+    bot_uuid: str = ""
 
     # 全局公开 ID = bot:<tenant>:<botid>(D82=A 服务端回填校验)
     public_bot_id: str = ""
@@ -94,9 +103,13 @@ class RegisterBotRequest:
 
     与 Account 区别:不带 account_id / created_at / updated_at
     (这些是服务端回填的字段)。
+
+    v1.3.0 (W7.1, D78) — 新增 bot_uuid 字段(可选,server-assigned,
+    不传 = 老 SDK v1.2.0 兼容路径,server 自动从 bot_id slug 寻址并生成)。
     """
     tenant_id: str = ""
     bot_id: str = ""
+    bot_uuid: str = ""
     owner_user_id: str = ""
     channel_type: str = ""
     channel_config_id: str = ""

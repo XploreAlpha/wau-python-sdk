@@ -170,6 +170,8 @@ WAU SDK 通过两段责任分工对接 N 个 Bot 平台:
 > **W5 反 W4.1 设计反转**(per 2026-07-13 Q1=B 拍板):SDK 端 bot/ 现已支持 8 平台(原 W4.1 仅 3 平台);5 平台 (Slack/Feishu/QQ/DingTalk/Email) 走 SDK 端 Stage 0 stub 替代原"⛔ 走服务端 adapter"。Stage 1 路径(per M11 W5-W6)将替换 stub 为 native SDK integration。W7 之后 wau-channel 8 平台 adapter 全部完整(per W7 2026-07-07 SDK 接通)。
 >
 > **W6.2 closure (2026-07-09)**: 5 平台 (Slack/Feishu/QQ/DingTalk/Email) Stage 0 stub → Stage 1 native SDK integration 100% 收口(per M10 N1 + D13 + D78 + D80 公共契约)。W6.0 同步补 dingtalk/email 2 子包(~220 LoC)。
+>
+> **v1.3.0 field add (W7.1, 2026-07-09)**:Add `bot_uuid` (UUID v4, server-assigned) to `Account` + `RegisterBotRequest` DTOs in `src/wau_sdk/bot/common/account.py`(per D78/D79/D80 拍板,D60 additive,0 breaking)。老 SDK v1.2.0 向后兼容(server 自动从 bot_id slug 寻址并生成 bot_uuid)。
 
 **使用范式**(4 SDK 一致,Go SDK 示例):
 
