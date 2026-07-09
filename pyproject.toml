@@ -29,6 +29,12 @@ dependencies = [
     "PyJWT>=2.8",
     "tenacity>=8.2",
     "protobuf>=5.27",
+    # W6.1 (2026-07-09) Stage 1 dep 追加 — 5 平台 SDK native integration
+    "slack-sdk>=3.27",                       # Slack async client + Socket Mode
+    "lark-oapi>=1.2",                        # Feishu/Lark EventDispatcher
+    "dingtalk-stream>=1.0",                  # DingTalk StreamCallback
+    "imapclient>=3.0",                       # Email IMAP IDLE (SMTP 用 stdlib smtplib)
+    # QQ: 官方 Python SDK 暂缺成熟 lib, 推 W7+ 评估 (fallback 用 httpx + OpenAPI v2)
 ]
 
 [project.optional-dependencies]
