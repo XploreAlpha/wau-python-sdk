@@ -444,3 +444,91 @@ class AsyncMCPClient:
         headers = build_headers(bearer_token=self._bearer_token, user_agent=self._user_agent)
         resp = await self._http.post(self._base_url + self._endpoint, json=envelope, headers=headers)
         return MCPClient._handle_response(resp, out_class)
+
+    # ── SSE streaming tool wrappers (D89.A.6, per D89 SOP §2.1.1) ──
+    async def stream_message(
+        self,
+        target: Any,
+        message: Message,
+        opts: Optional[Any] = None,
+    ) -> Any:
+        """调 stream_message tool 并开 SSE 长连接 (per D89.A.6 + D89 SOP §2.1.2)。
+
+        流程:
+          1. POST /mcp {tools/call, name=stream_message, arguments: {target, message, stream_options}}
+             → 返 {stream_id, endpoint}
+          2. GET <endpoint>?stream_id=<uuid>
+             → 持续读 SSE event 推到 handle.events()
+
+        返回的 StreamHandle 必须在不用时调 cancel()(或用 `async with` 自动清理)。
+
+        Args:
+            target: agent 标识(str 或 dict,跟 8 sync tool 一致)
+            message: Message DTO (role + 至少 1 个 Part)
+            opts: StreamOptions(可选),如 StreamOptions(include_history=True)
+
+        Returns:
+            StreamHandle(stream_id + events() + cancel())
+        """
+        # 本地 import 避免 mcp_streaming ↔ mcp_client 循环 import
+        from wau_sdk.mcp_streaming import (
+            StreamOptions,  # noqa: F401 - public re-export
+            open_stream,
+            _build_stream_arguments,
+        )
+
+        arguments = _build_stream_arguments(
+            "stream_message",
+            target,
+            message=message,
+            stream_options=opts,
+        )
+        return await open_stream(
+            base_url=self._base_url,
+            endpoint=self._endpoint,
+            tool_name="stream_message",
+            arguments=arguments,
+            bearer_token=self._bearer_token,
+            user_agent=self._user_agent,
+            http=self._http,
+        )
+
+    async def subscribe_to_task(
+        self,
+        target: Any,
+        task_id: str,
+        opts: Optional[Any] = None,
+    ) -> Any:
+        """调 subscribe_to_task tool 并开 SSE 长连接 (per D89.A.6 + D89 SOP §2.1.2)。
+
+        跟 stream_message 区别:参数是 task_id 而非 message。
+        SSE frame 类型以 task_status / task_complete 为主(message/artifact 可选)。
+
+        Args:
+            target: agent 标识
+            task_id: 订阅的 task UUID
+            opts: StreamOptions(可选),如 StreamOptions(include_artifacts=True)
+
+        Returns:
+            StreamHandle(stream_id + events() + cancel())
+        """
+        from wau_sdk.mcp_streaming import (
+            open_stream,
+            _build_stream_arguments,
+        )
+
+        arguments = _build_stream_arguments(
+            "subscribe_to_task",
+            target,
+            task_id=task_id,
+            stream_options=opts,
+        )
+        return await open_stream(
+            base_url=self._base_url,
+            endpoint=self._endpoint,
+            tool_name="subscribe_to_task",
+            arguments=arguments,
+            bearer_token=self._bearer_token,
+            user_agent=self._user_agent,
+            http=self._http,
+        )
