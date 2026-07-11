@@ -17,6 +17,32 @@
 
 ---
 
+## [Unreleased] — v1.3.2 "MCP client add (D87.6, 2026-07-11)"
+
+### Added
+
+- ⭐ New `mcp/` submodule: 5 files + tests, ~1500 LoC
+  - `src/wau_sdk/mcp_client.py` — `MCPClient` (sync) + `AsyncMCPClient` (async) + 8 sync tool wrapper methods
+  - `src/wau_sdk/mcp_dto.py` — 8 DTOs (`Message` / `Part` / `Task` / `Artifact` / `AgentCard` / `ExtendedAgentCard` / `HealthCheckResult` / `ListTasksFilter`+`ListTasksResult` / `PushConfig`+`PushConfigResult`)
+  - `src/wau_sdk/mcp_errors.py` — `RPCError` + 5 spec code (`-32700`/`-32600`/`-32601`/`-32602`/`-32603`) + 3 MCP-specific code (`-32001` ~ `-32003`)
+  - `src/wau_sdk/mcp_tools.py` — 10 tool name constants + `ALL_TOOL_NAMES` tuple + `is_streaming_tool` helper
+  - `src/wau_sdk/mcp_auth.py` — `set_bearer_token` / `build_headers` helpers
+  - `tests/test_mcp_client.py` — 38 unit tests covering 8 sync tool round-trip + W5 stub + error path + auth + helpers + async + concurrent
+- 8 sync MCP tool wrappers: `health_check` / `parse_agent_card` / `send_message` / `get_task` / `list_tasks` / `cancel_task` / `create_task_push_notification_config` / `get_extended_agent_card`
+- 2 SSE streaming tool (`stream_message` / `subscribe_to_task`) deferred to W5+ (W3-launch-SOP §3.3 拍板)
+- Per D87 ⭐⭐ decision; D60 additive (0 改老 `chat.py` / `bot/` / `ucp_*` / `_client.py` etc)
+- Cross-SDK JSON byte-equal alignment per D13
+- Bearer token 注入 OAuth 2.0 identity_linking (per D78/D79/D80)
+- W5 stub 友好路径(per W3-launch-SOP 渐进接入)
+
+### Compatibility
+
+- 100% 向后兼容 — 老 SDK v1.3.0 / v1.3.1 client 不感知 mcp/ 新增
+- 0 breaking change to existing APIs
+- JSON-RPC 2.0 envelope (`{jsonrpc: "2.0", method: "tools/call", params: {name, arguments}, id}`) 跟 wau-go-sdk `mcpclient/` 字段 1:1 对齐
+
+---
+
 ## [Unreleased] — v1.0.0 "Phoenix" M11 W8 (2026-07-08) → v1.3.1
 
 ### Added
