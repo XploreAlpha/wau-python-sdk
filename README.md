@@ -69,6 +69,26 @@ asyncio.run(main())
 - **gRPC stub**:`IntentService` 4 方法返 `NotImplementedError`(P2 推 M3.1)
 - **5 场景契约**:与 [wau-go-sdk](https://github.com/XploreAlpha/wau-go-sdk) 共享同一份黄金 JSON,3 SDK 行为对齐
 
+## v1.3.3 新增:UCP 客户端(per D88)
+
+```python
+from wau_sdk.ucp_client import UCPClient, AsyncUCPClient
+
+# 同步
+with UCPClient(
+    "https://kernel.example.com",
+    bearer_token="oauth-jwt",
+) as ucp:
+    cart = ucp.add_to_cart("prod-123", 2)
+    session = ucp.create_checkout_session(cart.cart_id)  # W3 stub,W5+ Stripe
+
+# 异步
+async with AsyncUCPClient("https://kernel.example.com", bearer_token=...) as ucp:
+    cart = await ucp.add_to_cart("prod-123", 2)
+```
+
+11 commerce tool(`list_products` / `add_to_cart` / `cancel_order` …)走 JSON-RPC 2.0 over HTTP(POST `/ucp`),8 commerce DTO(`@dataclass`,不是 Pydantic)跨 5 SDK byte-equal(per D13)。
+
 ## 测试
 
 ```bash

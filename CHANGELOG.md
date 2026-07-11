@@ -39,6 +39,49 @@
 
 ---
 
+## [Unreleased] — v1.3.3 "UCP client (W3, 2026-07-11, per D88)"
+
+### Added
+
+- 新 submodule(`ucp_client.py` / `ucp_dto.py` / `ucp_errors.py` / `ucp_stripe.py`),跟 `chat.py` / `bot/` 同级独立模块(D60 additive)
+- `UCPClient` + `AsyncUCPClient`:11 commerce tool wrapper(走 JSON-RPC 2.0 over HTTP,endpoint `POST {base_url}/ucp`):
+  - `list_products(filter: ListProductsFilter | None) -> ListProductsResult`
+  - `get_product(product_id: str) -> Product`
+  - `search_products(query: str, limit: int = 10) -> SearchProductsResult`
+  - `add_to_cart(product_id: str, quantity: int = 1) -> Cart`
+  - `get_cart(cart_id: str) -> Cart`
+  - `remove_from_cart(cart_id: str, line_item_id: str) -> Cart`
+  - `create_checkout_session(cart_id: str) -> CheckoutSession` — W3 stub,W5+ Stripe
+  - `confirm_payment(checkout_session_id: str) -> PaymentConfirmation` — W3 stub,W5+ Stripe
+  - `get_order(order_id: str) -> Order`
+  - `list_orders(user_id: str, filter: ListOrdersFilter | None) -> ListOrdersResult`
+  - `cancel_order(order_id: str) -> CancelOrderResult` — W5+ Stripe refund
+- 8 commerce DTO(`@dataclass`,不是 Pydantic)— `tenant_id` 字段(per D65 multi-tenant)
+- 11 ToolXxx 常量(`TOOL_LIST_PRODUCTS` … `TOOL_CANCEL_ORDER`)
+- `RPCError` + 5 spec code + 5 UCP-specific code(`-32101 ~ -32105` 跟 MCP `-32001 ~ -32003` 错开)
+- `RPCError.from_dict` / `is_not_found(err)` / `is_stripe_error(err)` helper
+- `set_bearer_token` / `set_tenant_id` helper(per D78/D79/D80 bearer + D65 tenant 隔离)
+- `is_stripe_path(tool_name)` Stripe 路径 helper(per D88.6)
+- `PAYMENT_STATUS_*` 4 常量(`SUCCEEDED` / `FAILED` / `PROCESSING` / `PENDING`)
+- 25 unit tests(httpx.MockTransport mock kernel + 11 tool round-trip + W3 stub 验证 + error path + auth helper + stripe helper + 4 async)100% PASS
+
+### Compatibility (D60 additive)
+
+- 0 改老 SDK(`chat.py` / `bot/` / `_client.py` / `_transport.py` 等全部 0 触碰)
+- 走独立 JSON-RPC 2.0 client(`_call_tool` 通用 dispatch),不耦合 `wau_sdk._client.Client.do_request`(跟 `chat.py` / `bot/` 同样的"独立 submodule" pattern)
+- W3 stub:`create_checkout_session` + `confirm_payment` 走 kernel `ErrNotImplemented` → SDK 抛 `NotImplementedError` 友好提示"W5 Stripe 集成中"
+- Stripe SDK 0 直接依赖(等 kernel `ucp_stripe.go` 落地 W5+)
+
+### Reference
+
+- D88 拍板(UCP server):[stage2/2026-07-10-D86-D87-D88-protocol-gateway-decision](https://github.com/wau-network/WAU-develop/blob/main/develop-log/kernel/v1.0.0/stage2/2026-07-10-D86-D87-D88-protocol-gateway-decision.md)
+- 5 SDK UCP client 详设:[process/2026-07-11-W3-UCP-client-SDK-design](https://github.com/wau-network/WAU-develop/blob/main/develop-log/kernel/v1.0.0/process/2026-07-11-W3-UCP-client-SDK-design.md)
+- UCP Stripe design:[process/2026-07-11-W3-UCP-Stripe-Checkout-design](https://github.com/wau-network/WAU-develop/blob/main/develop-log/kernel/v1.0.0/process/2026-07-11-W3-UCP-Stripe-Checkout-design.md)
+- 兄弟: wau-go-sdk v1.3.3 `ucpclient/` 已落地 (D88.5),跟本模块同步实跑
+- benny 迁移澄清:kernel UCP 是通用 commerce 垂直协议层,benny 保持独立 demo plugin(2026-07-11 user 拍板)
+
+---
+
 ## [v1.2.0] - 2026-07-02 (v0.9.0 GA)
 
 ### Highlights
