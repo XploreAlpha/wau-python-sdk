@@ -479,3 +479,92 @@ class ChatCompletionChunk:
     created: int = 0
     model: str = ""
     choices: list = field(default_factory=list)  # list[ChunkChoice]
+
+
+# ────────────────────────────────────────────────────────────
+# WauWorkflow(per v1.0.1 SoT doc + SDK Consumer Contract §二.2 + D78 byte-equal)
+# TS canonical: src/wau/types.ts#L116-L158
+# ────────────────────────────────────────────────────────────
+
+from typing import Literal, Optional
+
+# WauWorkflowType enum(6 值,per TS L34-L40)
+WauWorkflowType = Literal[
+    "WORKFLOW_TYPE_UNSPECIFIED",
+    "WORKFLOW_TYPE_SINGLE",
+    "WORKFLOW_TYPE_CHAIN",
+    "WORKFLOW_TYPE_PARALLEL",
+    "WORKFLOW_TYPE_QUORUM",
+    "WORKFLOW_TYPE_FAN_OUT",
+]
+
+
+@dataclass
+class WauWorkflowAgent:
+    """WauWorkflow 里单个 agent 推荐块(per TS L49-L55)。
+    跟 wau-intent proto WauWorkflowAgent 字段 1:1。
+    """
+    name: str
+    url: str
+    skills: list[str] = field(default_factory=list)
+    confidence: float = 0.0
+
+
+@dataclass
+class WauWorkflowDependency:
+    """DAG 依赖图节点(per TS L60-L62)。"""
+    upstream_agents: list[str] = field(default_factory=list)
+
+
+@dataclass
+class WauWorkflowDependencyGraph:
+    """WauWorkflow.dependency_graph 嵌套结构(per TS L119-L121)。"""
+    dependencies: dict[str, WauWorkflowDependency] = field(default_factory=dict)
+
+
+@dataclass
+class WauWorkflow:
+    """5 SDK 共享 wire format 的核心 DTO(per SDK Consumer Contract §二.2)。
+
+    19 字段(5 必填 + 14 元数据):
+      - 必填 5 字段:agents / dependency_graph / confidence / workflow_type / harness
+      - 标识 3 字段:workflow_id / created_at / user_id
+      - DAG pattern 元数据 3 optional:dag_pattern_hint / description / estimated_duration_ms
+      - 推荐上下文 3 字段:original_query / parent_workflow_id? / retry_count?
+      - Server metadata 3 字段:server_version / trace_id / ttl_ms
+      - 鉴权 2 字段:auth_user_id / auth_claim_set
+
+    JSON 字段 snake_case(per TS L15 + WauWorkflow msg type spec §三.3 + #14 A 拍板)
+
+    ⚠️ voice workflow 必须 harness='codex-appserver'(per #17 配错保护)
+    """
+    # === 必填 5 字段 ===
+    agents: list[WauWorkflowAgent]
+    dependency_graph: WauWorkflowDependencyGraph
+    confidence: float
+    workflow_type: WauWorkflowType
+    harness: str  # voice workflow 必须 'codex-appserver',其它 harness 抛错(per #17)
+
+    # === 标识字段 ===
+    workflow_id: str = ""
+    created_at: int = 0  # unix ms
+    user_id: str = ""
+
+    # === DAG pattern 元数据(per #4 抽象 wau-dag-patterns) ===
+    dag_pattern_hint: Optional[str] = None
+    description: Optional[str] = None
+    estimated_duration_ms: Optional[int] = None
+
+    # === 推荐上下文 ===
+    original_query: str = ""  # 用户原始 query
+    parent_workflow_id: Optional[str] = None  # 子 workflow 追溯
+    retry_count: Optional[int] = None  # 0=首次,1+=重试
+
+    # === Server-side metadata ===
+    server_version: str = ""  # wau-intent server version, byte-equal verify anchor
+    trace_id: str = ""  # 跨 SDK 调试 trace
+    ttl_ms: int = 0  # workflow 有效期,过期 client 拒收
+
+    # === 鉴权上下文(per D66=B JWT 4-claim) ===
+    auth_user_id: str = ""
+    auth_claim_set: list[str] = field(default_factory=list)  # 4 claim names:sub/aud/exp/scope
